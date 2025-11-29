@@ -1,0 +1,255 @@
+---
+title: "Evaluación Sumativa N1"
+author: "Debora Garrido Maril"
+format:
+  html:
+    css: styles.css
+editor: visual
+lang: es
+---
+
+## Evaluación Sumativa N°1 – Reproducibilidad y comunicación de resultados
+
+\
+En esta actividad, cada estudiante desarrollará un informe reproducible y replicable\
+utilizando Quarto (archivo .qmd que debe compilar correctamente a .html). El objetivo\
+principal es aplicar los principios de reproducibilidad, documentación clara y comunicación\
+efectiva de resultados, a partir del análisis de un conjunto de datos real.\
+Para ello, trabajarán con la Encuesta Nacional de Drogas (SENDA).
+
+Como primer paso, se debe desacargar la Encuesta Casen (enpg2022.RDS) y guardarla en una carpeta, que para efectos de esta actividad fue nombrada "Evaluacion N1) Para la correcta ejecución de la actividad, instalaremos las librerias que se utilizarán
+
+*Si arroja algún error en la instalación de las librerías, previamente debes instalar el paquete que contiene esa librería*
+
+```{r, }
+library(tidyverse) 
+library(ggplot2) 
+library(skimr) 
+library(rio)
+```
+
+Ahora crearemos un objeto, el correspondiente a nuestra base de datos; asignaremos el nombre (data_encuesta) y la importaremos desde la ruta donde se encuentra descargada y guardada nuestra base de datos. En este caso, se sugiere que en el import() reemplace la ruta por la correspondiente a donde usted guardó su base de datos.
+
+```{r}
+data_encuesta <- import("C:/Users/debog/OneDrive/Documentos/Evaluacion N1/enpg2022.RDS")
+```
+
+Como siguiente paso, haremos una selección de variables de nuestra base de datos, que serán las consideradas para el análisis a desarrollar.
+
+-   MAR_1 (¿Ha probado Ud. marihuana alguna vez en su vida? *Variable principal* )
+
+-   MAR_2 (¿Cuándo fue la primera vez que Ud. Consumió marihuana en su vida? *Variable secundaria 1*)
+
+-   MAR_7 (¿Qué tipo de marihuana consumió con mayor frecuencia? *Variable secundaria 2*)
+
+-   MAR_9 (¿Ha presentado estos problemas cuando suspendía o disminuía el consumo de marihuana? *Variable secundaria 3*).
+
+```{r}
+reducida_enpg <- data_encuesta %>% select(MAR_1, MAR_2, MAR_7, MAR_9) #esto nos permite crear un objeto que contenga las variables seleccionadas
+```
+
+La elección de variables alude a que a nivel social se ha pesquisado el alza de consumo de sustancias, siendo la puerta de entrada para estas el consumo de marihuana. En ese sentido, para su atención, es relevante conocer el período en que se inicia el consumo para determinar la magnitud del problema, como también las preferencias de consumo y la presencia de afectaciones producto de estas.
+
+#### 1. Exploración inicial de los datos: revisión de estructura, tipos de variables, detección de valores perdidos, distribución de variables y primeras observaciones relevantes.
+
+Revisaremos las características de nuestras variables
+
+```{r}
+head(reducida_enpg)  #nos muestra las primeras filas de nuestra baje y nos permite dar un vistazo rápido
+skim(reducida_enpg) #nos permite conocer más en profundidad nuestra base (estructura, tipo de variables, cantidad de datos perdidos)
+sum(is.na(reducida_enpg)) #cuenta los NA/valores perdidos que se encuentran en nuestra base
+```
+
+.
+
+#### 2. Limpieza y preparación: tratamiento de valores perdidos, recodificaciones necesarias, creación de categorías si corresponde, y cualquier ajuste que permita un análisis válido y replicable.
+
+De lo anterior, se observan variables que tienen resultados extremos (88 y 99) a los que le asignaremos el valor NA. Señalar que solo queremos trabajar con los datos de los encuestados que entregan información acerca de haber probado marihuana, por realizaremos una limpieza a la variable principal, excluyendo los valores NA de esta.
+
+```{r}
+reducida_limpia <- reducida_enpg %>%
+  mutate(
+    MAR_1 = na_if(MAR_1, 88),
+    MAR_1 = na_if(MAR_1, 99),
+    MAR_2 = na_if(MAR_2, 88),
+    MAR_2 = na_if(MAR_2, 99),
+    MAR_7 = na_if(MAR_7, 88),
+    MAR_7 = na_if(MAR_7, 99),
+    MAR_9 = na_if(MAR_9, 88),
+    MAR_9 = na_if(MAR_9, 99)
+  ) %>%
+  drop_na(MAR_1)
+```
+
+Para mayor comprensión de las variables que estamos explorando y que serán nuestra base de análisis, procederemos a renombrarlas y para ello utilizaremos el argumento rename()
+
+```{r}
+reducida_limpia <- reducida_limpia %>% 
+  rename(
+    consumo_marihuanaAV = MAR_1,
+    Primeravez_consumo = MAR_2,
+    Tipo_marihuana     = MAR_7,
+    Problemas_suspension = MAR_9
+  )
+head(reducida_limpia)
+```
+
+#### 3. Análisis descriptivo: presentación de una tabla general de descriptivos que incluya las variables seleccionadas.
+
+En primer lugar, revisaremos a través de una tabla general las descripciones de nuestras variables seleccionadas, aplicando el summary(), que nos permite, que entrega el resumen estadístico de cada variable
+
+```{r}
+reducida_limpia %>%
+  select(consumo_marihuanaAV, Primeravez_consumo, Tipo_marihuana, Problemas_suspension) %>%
+  summary()
+```
+
+#### 4. Análisis bivariado: cruce de la variable principal con cada una de las tres variables secundarias, generando al menos:
+
+##Tres gráficos bivariados, uno por cada cruce. ##Una tabla de resultados bivariados, donde se resuma la relación
+
+Antes de realizar los gráficos, recodificaremos las variables como factor, esto a fin de que no se produzcan dificultades en la elaboración de los mismos y las respuestas dadas por los encuestados, sean tratadas como categorías y no como números
+
+```{r}
+reducida_limpia <- reducida_limpia %>%
+mutate(
+consumo_marihuanaAV = factor(consumo_marihuanaAV,
+levels = c(1, 2),
+labels = c("Sí ha consumido", "No ha consumido")),
+Primeravez_consumo = factor(Primeravez_consumo,
+levels = c(1, 2, 3),
+labels = c("Últimos 30 días",
+"Hace más de 1 mes y menos de un año",
+"Hace más de un año")),
+Tipo_marihuana = factor(Tipo_marihuana,
+levels = c(1,2,3,4,5),
+labels = c("Prensada", "Verde",
+"Verde (autocultivo)",
+"Skunk",
+"Skunk (autocultivo)")),
+Problemas_suspension = factor(Problemas_suspension,
+levels = c(1,2),
+labels = c("Sí ha presentado",
+"No ha presentado"))
+)
+
+
+```
+
+Exploraremos cómo quedó nuestra base de datos limpia y con los categorías nombradas
+
+```{r}
+head(reducida_limpia)  
+skim(reducida_limpia) 
+sum(is.na(reducida_limpia))
+```
+
+Ahora realizaremos los gráficos, considerando nuestra variables principal "Consumo_marihuanaAV" y cruzándola con cada una de las variables secundarias "Primeravez_consumo", "Tipo_marihuana" y "Problemas_suspension"
+
+Como primer paso, para crear los gráficos, crearemos un nuevo objeto llamado "consumidores". Ello, para realizar los gráficos solo con aquellas personas encuestadas que han tenido consumo alguna vez
+
+```{r}
+consumidores <- reducida_limpia %>%
+filter(consumo_marihuanaAV == "Sí ha consumido")
+
+```
+
+Y ahora realizaremos los gráficos, considerando la selección previa, para trabajar con quienes si han consumido. El primer gráfico cruza las variables de consumo con cuando fue la primera vez que consumió
+
+```{r}
+ggplot(consumidores, aes(x = "", fill = Primeravez_consumo)) +
+geom_bar(width = 1) +
+coord_polar("y") +
+labs(
+title = "Cuando fue la primera vez que consumió marihuana",
+fill = "Primera vez que consumió"
+) +
+theme_void() +
+theme(
+plot.title = element_text(hjust = 0.5, face = "bold"),
+legend.title = element_text(face = "bold")
+)
+
+
+```
+
+El gráfico precedente, muestra la distribución del momento de primer consumo únicamente entre quienes declararon haber consumido marihuana alguna vez. La mayor proporción de personas indica que su primera experiencia ocurrió hace más de un año. En menor proporción aparecen quienes iniciaron el consumo hace más de un mes pero menos de un año, mientras que el grupo más reducido corresponde a quienes consumieron por primera vez en los últimos 30 días. Esto indica que el consumo reciente como primera experiencia es relativamente poco frecuente en este grupo.
+
+Incorporaremos la tabla bivariada que resuma la relación
+
+```{r}
+tabla1 <- consumidores %>%
+count(Primeravez_consumo) %>%
+mutate(pct = round(n / sum(n) * 100, 1))
+
+tabla1
+
+
+```
+
+Ahora, realizaremos el segundo gráfico, que da cuenta respecto de los consumidores, qué tipo de marihuana consumió con mayor frecuencia
+
+```{r}
+ggplot(consumidores, aes(x = "", fill = Tipo_marihuana)) +
+geom_bar(width = 1) +
+coord_polar("y") +
+labs(
+title = "Tipo de marihuana consumida con mayor frecuencia",
+fill = "Tipo de marihuana"
+) +
+theme_void() +
+theme(
+plot.title = element_text(hjust = 0.5, face = "bold"),
+legend.title = element_text(face = "bold")
+)
+
+
+```
+
+Observando las respuestas de quienes sí han consumido y tienen conocimiento acerca de la sustancia que concumen, se aprecia una mayor preferencia por tipos de marihuana “verde” y “verde de autocultivo”, en comparación con las variedades prensadas o de alta potencia (skunk). Esto puede reflejar cambios en la oferta disponible, preferencias por productos percibidos como más “naturales” o de mejor calidad, o mayor acceso a autocultivo. Las variedades prensadas muestran menor representación, lo que es consistente con tendencias nacionales que indican una disminución en su uso. En conjunto, el patrón revela una diversificación del mercado y una preferencia por productos no industrializados o de mayor potencia controlada. Sin perjuicio de lo anterior, llama la atención el desconocimiento de los encuestados, respecto del tipo de sustancia consumida, lo que podría asociarse a elementos relacionados al bajo autocuidado de las personas, como de las implicancias de la ingesta de sustancias e ingredientes desconocidos.
+
+Incorporarmos la información resumen en una tabla
+
+```{r}
+tabla2 <- consumidores %>%
+count(Tipo_marihuana) %>%
+mutate(pct = round(n / sum(n) * 100, 1))
+
+tabla2
+
+
+
+```
+
+Ahora, realizaremos el tercer gráfico, que cruza las variables Consumo y problemas al suspender o disminuir el consumo, determinando específicamente si ha presentado problemas o no.
+
+```{r}
+ggplot(consumidores, aes(x = "", fill = Problemas_suspension)) +
+geom_bar(width = 1) +
+coord_polar("y") +
+labs(
+title = "Problemas al suspender o disminuir el consumo",
+fill = "Problemas al suspender"
+) +
+theme_void() +
+theme(
+plot.title = element_text(hjust = 0.5, face = "bold"),
+legend.title = element_text(face = "bold")
+)
+
+
+```
+
+Dentro del grupo de consumidores, una proporción considerable declara no haber presentado problemas al suspender o reducir su consumo de marihuana. Sin embargo, también existe un grupo que sí reporta dificultades, lo cual puede ser indicativo de síntomas de dependencia, malestar físico o psicológico, o patrones de consumo problemático. Este hallazgo es importante desde una perspectiva de salud pública, pues evidencia que, aunque no todos los consumidores enfrentan problemas, existe un subgrupo que podría requerir intervención preventiva o apoyo especializado. Asimismo, resulta importante el número de NA presentes (cuya opción de respuesta es "no sabe" o "no contesta"), lo que puede estar relacionado al desconocimiento que tienen acerca de las consecuencias del consumo o del hermetismo que se puede presentar en quienes se encuentran en ingesta de sustancias ilícitas.
+
+Y realizaremos la tabla resumen respectiva
+
+```{r}
+tabla3 <- consumidores %>%
+count(Problemas_suspension) %>%
+mutate(pct = round(n / sum(n) * 100, 1))
+
+tabla3
+
+
+```
